@@ -1,0 +1,521 @@
+% clc;
+% Dajan Test 
+% Apply PCA to data set of the spectrum with normalization of each freq bin, and get new "projection".
+% Select 30 wave files, include 10 pass, 10 fail and 10 unkonw to build the
+% pca model.
+% The result can be used as basics of classification.
+
+% After model is build by the m-file. Run "group3_transfer" to classify
+% wave file. 
+
+% Refer to
+% http://research.med.helsinki.fi/corefacilities/proteinchem/pca_introduction_basics.pdf
+% and
+% https://learnche.org/pid/latent-variable-modelling/principal-component-analysis/pca-example-analysis-of-spectral-data
+% Albert Hsu  2018/04/20
+% This is wavelet transform test
+
+
+L_r = 16384;
+N = 30; % 60 number of oberservation
+FrameN = 1; %length(x1)/L;
+L = L_r/FrameN;
+dwtDepth = 4;
+base = 'rbio5.5'; %bior6.8 rbio6.8
+features = 6;
+
+OKDir = 'C:\Matlab\work\PCA\Dajan 3000 pcs Test\Wavelet\pass_clusteredMinorFail\';
+%OKDir = 'C:\Matlab\work\PCA\Dajan 3000 pcs Test\ThreeGroup\pass\';
+temp0=dir([OKDir,'*.wav']);
+num_temp0=length(temp0);
+
+
+
+%files below are fail for sure
+failDir = 'C:\Matlab\work\PCA\Dajan 3000 pcs Test\Wavelet\fail_clusteredMinorFail\';
+%failDir = 'C:\Matlab\work\PCA\Dajan 3000 pcs Test\ThreeGroup\fail\';
+temp1=dir([failDir,'*.wav']);
+num_temp1=length(temp1);
+
+
+
+N = num_temp0 + num_temp1; 
+x = zeros(L_r , N);
+
+%%----------------discrete packle wavele transform-----------------
+for i = 1:num_temp0
+    filename=[OKDir,temp0(i).name];
+    x(:, i) = wavread(filename, L_r);
+end
+
+for i = 1:num_temp1
+    filename=[failDir,temp1(i).name];
+    x(:, num_temp0+i) = wavread(filename, L_r);
+end
+
+
+%h = hann(L/(2^dwtDepth));
+h = hann(L);
+for i = 1:N
+    x(:,i) = x(:,i).*h;
+end
+
+
+if dwtDepth == 3
+    [A,D] = dwt(x(:,1), base);
+    L1 = length(A);
+    dwtLev1 = zeros(L1,N*2);
+    [AA,DA] = dwt(A(:,1), base);
+    L2 = length(AA);
+    dwtLev2 = zeros(L2,N*2*2);
+    [AAA,DAA] = dwt(AA(:,1), base);
+    L3 = length(AAA);
+    dwtLev3 = zeros(L3, N*2*2*2);
+    %x_ps_temp = zeros(L3, N*2^dwtDepth);
+    x_psD1 = zeros(L1/2, N);
+    x_psD2 = zeros(L2/2, N);
+    x_psD3 = zeros(L3/2, N);
+    x_psLA = zeros(L3/2, N);
+    for i = 1:N                                                       %A  %D
+        [dwtLev1(:,i),dwtLev1(:,N+i)] = dwt(x(:,i), base);   %dwtLev1(1:N N+1:2N): dwtLev1(:,1:N) is A. dwtLev1(:,N+1:2N) is D (D1) 
+    end
+    
+    for i = 1:N*2                                                             %AA   AD       DA      DD
+        [dwtLev2(:,i), dwtLev2(:,2*N+i)] = dwt(dwtLev1(:,i), base);  %dwtLev2(1:N , N+1:2N , 2N+1:3N, :)   dwtLev2(:,1:N) is AA. dwtLev2(:,2N+1:3N) is DA (D2)
+    end
+    
+    for i = 1:N*4                                                            %AAA   AAD    ADA        ADD    DAA
+        [dwtLev3(:,i), dwtLev3(:,4*N+i)] = dwt(dwtLev2(:,i), base); %dwtLev3(1:N,  N+1:2N, 2N+1:3N, 3N+1:4N, 4N+1:5N, ). dwtLev3(4N+1:5N) is D3
+    end
+    
+    x_ps_temp = abs(fft(dwtLev1(:,N+1:2*N)));
+    x_psD1 = x_ps_temp(1:L1/2,:); 
+    x_ps_temp = abs(fft(dwtLev2(:,2*N+1:3*N)));
+    x_psD2 = x_ps_temp(1:L2/2,:);
+    x_ps_temp = abs(fft(dwtLev3(:,4*N+1:5*N)));
+    x_psD3 = x_ps_temp(1:L3/2,:);
+    x_ps_temp = abs(fft(dwtLev3(:,1:N)));
+    x_psLA = x_ps_temp(1:L3/2,:);
+end
+
+if dwtDepth == 4
+    [A,D] = dwt(x(:,1), base);
+    L1 = length(A);
+    dwtLev1 = zeros(L1,N*2);
+    [AA,DA] = dwt(A(:,1), base);
+    L2 = length(AA);
+    dwtLev2 = zeros(L2,N*2*2);
+    [AAA,DAA] = dwt(AA(:,1), base);
+    L3 = length(AAA);
+    dwtLev3 = zeros(L3, N*2*2*2);
+    [AAAA, DAAA] = dwt(AAA(:,1), base);
+    L4 = length(AAAA);
+    dwtLev4 = zeros(L4, N*2*2*2*2);
+    %x_ps_temp = zeros(L4, N*2^dwtDepth);
+    x_psD1 = zeros(L1/2, N);
+    x_psD2 = zeros(L2/2, N);
+    x_psD3 = zeros(L3/2, N);
+    x_psD4 = zeros(L4/2, N);
+    x_psLA = zeros(L4/2, N);
+    
+    for i = 1:N
+        [dwtLev1(:,i),dwtLev1(:,N+i)] = dwt(x(:,i), base);
+    end
+    
+    for i = 1:N*2
+        [dwtLev2(:,i), dwtLev2(:,2*N+i)] = dwt(dwtLev1(:,i), base);
+    end
+    
+    for i = 1:N*4
+        [dwtLev3(:,i), dwtLev3(:,4*N+i)] = dwt(dwtLev2(:,i), base);
+    end
+    
+    for i = 1:N*8
+        [dwtLev4(:,i), dwtLev4(:,8*N+i)] = dwt(dwtLev3(:,i), base);
+    end
+    
+    x_ps_temp = abs(fft(dwtLev1(:,N+1:2*N)));
+    x_psD1 = x_ps_temp(1:L1/2,:); 
+    x_ps_temp = abs(fft(dwtLev2(:,2*N+1:3*N)));
+    x_psD2 = x_ps_temp(1:L2/2,:);
+    x_ps_temp = abs(fft(dwtLev3(:,4*N+1:5*N)));
+    x_psD3 = x_ps_temp(1:L3/2,:);
+    x_ps_temp = abs(fft(dwtLev4(:,8*N+1:9*N)));
+    x_psD4 = x_ps_temp(1:L4/2,:);
+    x_ps_temp = abs(fft(dwtLev4(:,1:N)));
+    x_psLA = x_ps_temp(1:L4/2,:);
+end
+
+if dwtDepth == 5
+     [A,D] = dwt(x(:,1), base);
+    L1 = length(A);
+    dwtLev1 = zeros(L1,N*2);
+    [AA,DA] = dwt(A(:,1), base);
+    L2 = length(AA);
+    dwtLev2 = zeros(L2,N*2*2);
+    [AAA,DAA] = dwt(AA(:,1), base);
+    L3 = length(AAA);
+    dwtLev3 = zeros(L3, N*2*2*2);
+    [AAAA, DAAA] = dwt(AAA(:,1), base);
+    L4 = length(AAAA);
+    dwtLev4 = zeros(L4, N*2*2*2*2);
+    [AAAAA, DAAAA] = dwt(AAAA(:,1), base);
+    L5 = length(AAAAA);
+    dwtLev5 = zeros(L5, N*2*2*2*2*2);
+    x_psD1 = zeros(L1/2, N);
+    x_psD2 = zeros(L2/2, N);
+    x_psD3 = zeros(L3/2, N);
+    x_psD4 = zeros(L4/2, N);
+    x_psD5 = zeros(L5/2, N);
+    x_psLA = zeros(L5/2, N);
+    for i = 1:N
+        [dwtLev1(:,i),dwtLev1(:,N+i)] = dwt(x(:,i), base);
+    end
+    
+    for i = 1:N*2
+        [dwtLev2(:,i), dwtLev2(:,2*N+i)] = dwt(dwtLev1(:,i), base);
+    end
+    
+    for i = 1:N*4
+        [dwtLev3(:,i), dwtLev3(:,4*N+i)] = dwt(dwtLev2(:,i), base);
+    end
+    
+    for i = 1:N*8
+        [dwtLev4(:,i), dwtLev4(:,8*N+i)] = dwt(dwtLev3(:,i), base);
+    end
+    
+    for i = 1:N*16
+        [dwtLev5(:,i), dwtLev5(:,16*N+i)] = dwt(dwtLev4(:,i), base);
+    end
+    
+    x_ps_temp = abs(fft(dwtLev1(:,N+1:2*N)));
+    x_psD1 = x_ps_temp(1:L1/2,:); 
+    x_ps_temp = abs(fft(dwtLev2(:,2*N+1:3*N)));
+    x_psD2 = x_ps_temp(1:L2/2,:);
+    x_ps_temp = abs(fft(dwtLev3(:,4*N+1:5*N)));
+    x_psD3 = x_ps_temp(1:L3/2,:);
+    x_ps_temp = abs(fft(dwtLev4(:,8*N+1:9*N)));
+    x_psD4 = x_ps_temp(1:L4/2,:);
+    x_ps_temp = abs(fft(dwtLev5(:,16*N+1:17*N)));
+    x_psD5 = x_ps_temp(1:L5/2,:);
+    x_ps_temp = abs(fft(dwtLev5(:,1:N)));
+    x_psLA = x_ps_temp(1:L5/2,:);
+end
+
+if dwtDepth == 6
+    [A,D] = dwt(x(:,1), base);
+    L1 = length(A);
+    dwtLev1 = zeros(L1,N*2);
+    [AA,DA] = dwt(A(:,1), base);
+    L2 = length(AA);
+    dwtLev2 = zeros(L2,N*2*2);
+    [AAA,DAA] = dwt(AA(:,1), base);
+    L3 = length(AAA);
+    dwtLev3 = zeros(L3, N*2*2*2);
+    [AAAA, DAAA] = dwt(AAA(:,1), base);
+    L4 = length(AAAA);
+    dwtLev4 = zeros(L4, N*2*2*2*2);
+    [AAAAA, DAAAA] = dwt(AAAA(:,1), base);
+    L5 = length(AAAAA);
+    dwtLev5 = zeros(L5, N*2*2*2*2*2);
+    [AAAAAA, DAAAAA] = dwt(AAAAA(:,1), base);
+    L6 = length(AAAAAA);
+    dwtLev6 = zeros(L6, N*2*2*2*2*2*2);
+    for i = 1:N
+        [dwtLev1(:,i),dwtLev1(:,N+i)] = dwt(x(:,i), base);
+    end
+    
+    for i = 1:N*2
+        [dwtLev2(:,i), dwtLev2(:,2*N+i)] = dwt(dwtLev1(:,i), base);
+    end
+    
+    for i = 1:N*4
+        [dwtLev3(:,i), dwtLev3(:,4*N+i)] = dwt(dwtLev2(:,i), base);
+    end
+    
+    for i = 1:N*8
+        [dwtLev4(:,i), dwtLev4(:,8*N+i)] = dwt(dwtLev3(:,i), base);
+    end
+    
+    for i = 1:N*16
+        [dwtLev5(:,i), dwtLev5(:,16*N+i)] = dwt(dwtLev4(:,i), base);
+    end
+    
+    for i = 1:N*32
+        [dwtLev6(:,i), dwtLev6(:,32*N+i)] = dwt(dwtLev5(:,i), base);
+    end
+    
+    PCA_feat = zeros(features*2^dwtDepth, N);
+    for i = 1:N
+        for j = 1:2^dwtDepth
+            PCA_feat(features*(j-1)+1,i) = var(dwtLev6(:,N*(j-1)+i));
+            PCA_feat(features*(j-1)+2,i) = skewness(dwtLev6(:,N*(j-1)+i));
+            PCA_feat(features*(j-1)+3,i) = kurtosis(dwtLev6(:,N*(j-1)+i));
+            PCA_feat(features*(j-1)+4,i) = sqrt(sum((dwtLev6(:,N*(j-1)+i)).*dwtLev6(:,N*(j-1)+i))/length(dwtLev6(:,1)));
+            PCA_feat(features*(j-1)+5,i) = mean(dwtLev6(:,N*(j-1)+i));
+            PCA_feat(features*(j-1)+6,i) = (max(dwtLev6(:,N*(j-1)+i))-min(dwtLev6(:,N*(j-1)+i))) / sqrt(mean([dwtLev6(:,N*(j-1)+i)].^2)); %peak 2 rms. aka crest factor
+        end
+    end
+end
+
+x_psD1 = 20*log10(x_psD1);
+x_psD2 = 20*log10(x_psD2);
+x_psD3 = 20*log10(x_psD3);
+if dwtDepth >= 4
+    x_psD4 = 20*log10(x_psD4);
+end
+
+if dwtDepth >= 5
+    x_psD5 = 20*log10(x_psD5);
+end
+x_psLA = 20*log10(x_psLA);
+
+%normalize and get rid off offset of power spectrum
+offsetD1 = repmat(scaleMeanD1, 1, N);
+offsetD2 = repmat(scaleMeanD2, 1, N);
+offsetD3 = repmat(scaleMeanD3, 1, N);
+if dwtDepth>=4
+    offsetD4 = repmat(scaleMeanD4, 1, N);
+end
+if dwtDepth>=5
+    offsetD5 = repmat(scaleMeanD5, 1, N);
+end
+offsetLA = repmat(scaleMeanLA, 1, N);
+
+x_psD1 = x_psD1 - offsetD1;
+x_psD2 = x_psD2 - offsetD2;
+x_psD3 = x_psD3 - offsetD3;
+if dwtDepth>=4
+    x_psD4 = x_psD4 - offsetD4;
+end
+if dwtDepth>=5
+    x_psD5 = x_psD5 - offsetD5;
+end
+x_psLA = x_psLA - offsetLA;
+
+
+
+
+
+% normalized std for each spectrum data
+for i = 1:length(x_psD1(:,1))
+    x_psD1(i,:) = x_psD1(i,:)./ nor_xpsD1(i); 
+end
+
+for i = 1:length(x_psD2(:,1))
+    x_psD2(i,:) = x_psD2(i,:)./ nor_xpsD2(i); 
+end
+
+for i = 1:length(x_psD3(:,1))
+    x_psD3(i,:) = x_psD3(i,:)./ nor_xpsD3(i); 
+end
+
+if dwtDepth >= 4
+    for i = 1:length(x_psD4(:,1))
+        x_psD4(i,:) = x_psD4(i,:)./ nor_xpsD4(i);
+    end
+end
+
+if dwtDepth >= 5
+    for i = 1:length(x_psD5(:,1))
+        x_psD5(i,:) = x_psD5(i,:)./ nor_xpsD5(i);
+    end
+end
+
+for i = 1:length(x_psLA(:,1))
+    x_psLA(i,:) = x_psLA(i,:)./ nor_xpsLA(i); 
+end
+
+%PCA transfer
+pcsN = 10;
+transD1 = (VD1(:,1:pcsN)'*x_psD1)';
+transD2 = (VD2(:,1:pcsN)'*x_psD2)';
+transD3 = (VD3(:,1:pcsN)'*x_psD3)';
+
+if dwtDepth >= 4
+    transD4 = (VD4(:,1:pcsN)'*x_psD4)';
+end
+
+if dwtDepth >= 5
+    transD5 = (VD5(:,1:pcsN)'*x_psD5)';
+end
+
+transLA = (VLA(:,1:pcsN)'*x_psLA)';
+
+good = zeros(num_temp0,dwtDepth+1);
+bad  = zeros(num_temp1,dwtDepth+1);
+
+
+if dwtDepth == 3
+    for i = 1:num_temp0
+        good(i,1) = transD1(i,1);
+        good(i,2) = transD2(i,1);
+        good(i,3) = transD3(i,1);
+        good(i,4) = transLA(i,1);
+    end
+
+    for i = 1:num_temp1
+        bad(i,1) = transD1(num_temp0+i,1);
+        bad(i,2) = transD2(num_temp0+i,1);
+        bad(i,3) = transD3(num_temp0+i,1);
+        bad(i,4) = transLA(num_temp0+i,1);
+    end
+
+end
+
+if dwtDepth == 4
+    for i = 1:num_temp0
+        good(i,1) = transD1(i,1);
+        good(i,2) = transD2(i,1);
+        good(i,3) = transD3(i,1);
+        good(i,4) = transD4(i,1);
+        good(i,5) = transLA(i,1);
+    end
+
+    for i = 1:num_temp1
+        bad(i,1) = transD1(num_temp0+i,1);
+        bad(i,2) = transD2(num_temp0+i,1);
+        bad(i,3) = transD3(num_temp0+i,1);
+        bad(i,4) = transD4(num_temp0+i,1);
+        bad(i,5) = transLA(num_temp0+i,1);
+    end
+end
+
+if dwtDepth == 5
+    for i = 1:num_temp0
+        good(i,1) = transD1(i,1);
+        good(i,2) = transD2(i,1);
+        good(i,3) = transD3(i,1);
+        good(i,4) = transD4(i,1);
+        good(i,5) = transD5(i,1);
+        good(i,6) = transLA(i,1);
+    end
+
+    for i = 1:num_temp1
+        bad(i,1) = transD1(num_temp0+i,1);
+        bad(i,2) = transD2(num_temp0+i,1);
+        bad(i,3) = transD3(num_temp0+i,1);
+        bad(i,4) = transD4(num_temp0+i,1);
+        bad(i,5) = transD5(num_temp0+i,1);
+        bad(i,6) = transLA(num_temp0+i,1);
+    end
+end
+
+%PCA Analysis
+%[pcs, trans, evs] = princomp(x_ps');
+%[pcs, trans, evs] = princomp(x_ps_peak');
+%[trans,pcs,evs] = pca1(x_ps_peak);
+% trans = real(trans);
+% % -----------------Below are SVD transpose in freq
+% pcsN = 10;
+% [U , S, V] = svd(x_ps');
+% %trans = (pcs'*x_ps)';
+% trans = (V'*x_ps)';
+
+%test: normalized projection on each pc
+% for i = 1:pcsN
+% trans(:,i) = trans(:,i)./S(i,i);
+% end
+
+
+figure
+hold on
+for i = 1:num_temp0
+    plot(good(i,:))
+end
+
+for i = 1:num_temp1
+    plot(bad(i,:), 'r')
+end
+
+
+%k mean cluster
+
+%threshold verify:
+cluster = zeros(N,1);
+transTAll = zeros(N, dwtDepth+1);
+for i = 1:num_temp0
+    transTAll(i,:) = good(i,:);
+end
+for i = 1:num_temp1
+    transTAll(num_temp0+i,:) = bad(i,:);
+end
+pass = c2(1,:);
+fail = c2(2,:);
+
+
+for i =1:N  
+    transTr = transTAll(i,:);
+    distP = transTr - pass;
+    distP = sum(distP.*distP);
+    distF = transTr - fail;
+    distF = sum(distF.*distF);
+    if(distP<distF)
+        cluster(i) = 1;
+    end
+    if(distF<distP)
+        cluster(i) = 2;
+    end
+end
+cluster'
+% if dwtDepth == 3
+%     stdD1 = (limit1T - limit1B)/6;
+%     stdD2 = (limit2T - limit2B)/6;
+%     stdD3 = (limit3T - limit3B)/6;
+%     stdLA = (limit4T - limit4B)/6;
+% end
+% 
+% if dwtDepth == 4
+%     stdD1 = (limit1T - limit1B)/6;
+%     stdD2 = (limit2T - limit2B)/6;
+%     stdD3 = (limit3T - limit3B)/6;
+%     stdD4 = (limit4T - limit4B)/6;
+%     stdLA = (limit5T - limit5B)/6;
+% end
+% 
+% 
+% 
+% if dwtDepth == 3
+%     for i = 1:N
+%         if transD1(i,1)<limit1T & transD1(i,1)>limit1B & transD2(i,1)<limit2T & transD2(i,1)>limit2B & transD3(i,1)<limit3T & transD3(i,1)>limit3B & transLA(i,1)<limit4T & transLA(i,1)>limit4B 
+%             cluster(i) = 1;
+%         else
+%             cluster(i) = 2;
+%         end
+%     end
+% end
+% 
+% if dwtDepth == 4
+%     for i = 1:N
+%         if transD1(i,1)<limit1T & transD1(i,1)>limit1B & transD2(i,1)<limit2T & transD2(i,1)>limit2B & transD3(i,1)<limit3T & transD3(i,1)>limit3B & transD4(i,1)<limit4T & transD4(i,1)>limit4B & transLA(i,1)<limit5T & transLA(i,1)>limit5B
+%             cluster(i) = 1;
+%         else
+%             cluster(i) = 2;
+%         end
+%     end
+% end
+% 
+% if dwtDepth == 5
+%     for i = 1:N
+%         if transD1(i,1)<limit1T & transD1(i,1)>limit1B & transD2(i,1)<limit2T & transD2(i,1)>limit2B & transD3(i,1)<limit3T & transD3(i,1)>limit3B & transD4(i,1)<limit4T & transD4(i,1)>limit4B & transD5(i,1)<limit5T & transD5(i,1)>limit5B & transLA(i,1)<limit6T & transLA(i,1)>limit6B 
+%             cluster(i) = 1;
+%         else
+%             cluster(i) = 2;
+%         end
+%     end
+% end
+% 
+% cluster'
+% %% SVD Test
+% for i = 1:5
+%     meanV(:,i) = mean(x(:,i))*ones(L,1);  
+% end
+% xz = x - meanV;
+% %[U , S, V] = svds(xz,SensorN);
+% [U , S, V] = svds(xz,1);
+% xr = U*S*V';
+% xr_fs = abs(fft(xr(:,1)));
+% xr_fs = xr_fs(1:length(xr_fs)/2);
+
+
+
